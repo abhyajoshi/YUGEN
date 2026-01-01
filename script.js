@@ -1,4 +1,4 @@
-// YŪGEN - Enhanced Version with Comments, Follow/Unfollow, Dark Mode
+// YŪGEN - Enhanced Version with Comments, Follow/Unfollow, Dark Mode, Profile Customization, Delete Posts
 var currentUser = null;
 var allUsers = JSON.parse(localStorage.getItem('yugen_users')) || [];
 var allPosts = JSON.parse(localStorage.getItem('yugen_posts')) || [];
@@ -7,9 +7,16 @@ var selectedFeelings = ['soft'];
 var currentMedia = 'https://images.unsplash.com/photo-1604537529428-15bcbeecfe4d?w=800&q=80';
 var currentFeedFilter = 'all';
 
-// Content Moderation
+// Content Moderation - Enhanced to catch variations
 var offensiveWords = ['hate', 'kill', 'stupid', 'idiot', 'dumb', 'loser', 'ugly'];
-var hateSpeechPatterns = [/\bkys\b/i, /\bstfu\b/i, /f+u+c+k/i, /s+h+i+t/i, /b+i+t+c+h/i, /a+s+s+h+o+l+e/i];
+var hateSpeechPatterns = [
+    /\bkys\b/i, 
+    /\bstfu\b/i, 
+    /f+[\W_]*u+[\W_]*c+[\W_]*k+/i, 
+    /s+[\W_]*h+[\W_]*i+[\W_]*t+/i, 
+    /b+[\W_]*i+[\W_]*t+[\W_]*c+[\W_]*h+/i, 
+    /a+[\W_]*s+[\W_]*s+[\W_]*h+[\W_]*o+[\W_]*l+[\W_]*e+/i
+];
 
 function containsHateSpeech(text) {
     if (!text) return false;
@@ -121,7 +128,9 @@ document.getElementById('signup-btn').addEventListener('click', function() {
         username: username,
         email: email,
         password: password,
-        following: []
+        following: [],
+        bio: '',
+        profilePic: ''
     };
     
     allUsers.push(newUser);
@@ -150,6 +159,8 @@ document.getElementById('login-btn').addEventListener('click', function() {
     
     if (user) {
         if (!user.following) user.following = [];
+        if (!user.bio) user.bio = '';
+        if (!user.profilePic) user.profilePic = '';
         currentUser = user;
         localStorage.setItem('yugen_current_user', JSON.stringify(currentUser));
         showMainApp();
@@ -169,10 +180,106 @@ function showMainApp() {
     document.getElementById('main-app').style.display = 'block';
     document.getElementById('profile-name').textContent = currentUser.name;
     document.getElementById('profile-username').textContent = '@' + currentUser.username;
-    document.getElementById('profile-avatar-text').textContent = currentUser.name.charAt(0).toUpperCase();
     document.getElementById('following-count').textContent = currentUser.following ? currentUser.following.length : 0;
+    
+    updateProfileDisplay();
     loadPosts();
     loadFriends();
+    
+    // Initialize profile customization event listeners
+    initializeProfileCustomization();
+}
+
+// Profile Customization Functions
+function initializeProfileCustomization() {
+    document.getElementById('edit-avatar-btn').addEventListener('click', function() {
+        document.getElementById('profile-pic-input').click();
+    });
+
+    document.getElementById('profile-pic-input').addEventListener('change', function(e) {
+        var file = e.target.files[0];
+        if (file) {
+            var reader = new FileReader();
+            reader.onload = function(event) {
+                var profilePic = event.target.result;
+                
+                // Update current user
+                currentUser.profilePic = profilePic;
+                
+                // Update in allUsers array
+                var userIndex = allUsers.findIndex(function(u) { return u.id === currentUser.id; });
+                if (userIndex !== -1) {
+                    allUsers[userIndex].profilePic = profilePic;
+                    localStorage.setItem('yugen_users', JSON.stringify(allUsers));
+                }
+                
+                // Save to current user storage
+                localStorage.setItem('yugen_current_user', JSON.stringify(currentUser));
+                
+                // Update display
+                updateProfileDisplay();
+                
+                alert('Profile picture updated! 📸');
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    document.getElementById('edit-bio-btn').addEventListener('click', function() {
+        var currentBio = currentUser.bio || '';
+        var newBio = prompt('Edit your bio (max 150 characters):', currentBio);
+        
+        if (newBio !== null) {
+            if (newBio.length > 150) {
+                alert('Bio must be 150 characters or less');
+                return;
+            }
+            
+            if (containsHateSpeech(newBio)) {
+                showWarning('Your bio contains inappropriate language. Please choose kinder words.');
+                return;
+            }
+            
+            // Update current user
+            currentUser.bio = newBio.trim();
+            
+            // Update in allUsers array
+            var userIndex = allUsers.findIndex(function(u) { return u.id === currentUser.id; });
+            if (userIndex !== -1) {
+                allUsers[userIndex].bio = newBio.trim();
+                localStorage.setItem('yugen_users', JSON.stringify(allUsers));
+            }
+            
+            // Save to current user storage
+            localStorage.setItem('yugen_current_user', JSON.stringify(currentUser));
+            
+            // Update display
+            updateProfileDisplay();
+        }
+    });
+}
+
+function updateProfileDisplay() {
+    // Update profile picture in profile page
+    if (currentUser.profilePic) {
+        document.getElementById('profile-pic').src = currentUser.profilePic;
+        document.getElementById('profile-pic').style.display = 'block';
+        document.getElementById('profile-avatar-text').style.display = 'none';
+    } else {
+        document.getElementById('profile-pic').style.display = 'none';
+        document.getElementById('profile-avatar-text').style.display = 'flex';
+        document.getElementById('profile-avatar-text').textContent = currentUser.name.charAt(0).toUpperCase();
+    }
+    
+    // Update bio
+    if (currentUser.bio && currentUser.bio.trim()) {
+        document.getElementById('profile-bio-display').textContent = currentUser.bio;
+        document.getElementById('profile-bio-display').style.fontStyle = 'normal';
+        document.getElementById('profile-bio-display').style.color = '';
+    } else {
+        document.getElementById('profile-bio-display').textContent = 'Add a bio to express yourself...';
+        document.getElementById('profile-bio-display').style.fontStyle = 'italic';
+    }
 }
 
 // Theme Toggle
@@ -337,6 +444,15 @@ function loadPosts() {
             html += '<button class="follow-btn' + (isFollowing ? ' following' : '') + '" onclick="toggleFollow(\'' + p.userId + '\')">' +
                 (isFollowing ? 'Following' : '+ Follow') +
                 '</button>';
+        } else {
+            html += '<button class="delete-post-btn" onclick="deletePost(\'' + p.id + '\')" title="Delete post">' +
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+                '<polyline points="3 6 5 6 21 6"></polyline>' +
+                '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>' +
+                '<line x1="10" y1="11" x2="10" y2="17"></line>' +
+                '<line x1="14" y1="11" x2="14" y2="17"></line>' +
+                '</svg>' +
+                '</button>';
         }
         
         html += '</div>' +
@@ -401,6 +517,21 @@ function toggleFollow(userId) {
     localStorage.setItem('yugen_current_user', JSON.stringify(currentUser));
     document.getElementById('following-count').textContent = currentUser.following.length;
     loadPosts();
+}
+
+function deletePost(postId) {
+    if (confirm('Are you sure you want to delete this post? This cannot be undone.')) {
+        var postIndex = allPosts.findIndex(function(p) { return p.id === postId; });
+        if (postIndex !== -1) {
+            allPosts.splice(postIndex, 1);
+            localStorage.setItem('yugen_posts', JSON.stringify(allPosts));
+            loadPosts();
+            
+            // Update post count in profile if on profile view
+            var userPosts = allPosts.filter(function(p) { return p.userId === currentUser.id; });
+            document.getElementById('posts-count').textContent = userPosts.length;
+        }
+    }
 }
 
 function toggleComments(postId) {
@@ -550,113 +681,4 @@ function sendMsg(userId) {
     input.value = '';
     openChat(userId, conv.userName);
     loadChats();
-
-    // PROFILE CUSTOMIZATION
-document.getElementById('edit-avatar-btn').addEventListener('click', function() {
-    document.getElementById('profile-pic-input').click();
-});
-
-document.getElementById('profile-pic-input').addEventListener('change', function(e) {
-    var file = e.target.files[0];
-    if (file) {
-        var reader = new FileReader();
-        reader.onload = function(event) {
-            var profilePic = event.target.result;
-            
-            // Update current user
-            currentUser.profilePic = profilePic;
-            
-            // Update in allUsers array
-            var userIndex = allUsers.findIndex(function(u) { return u.id === currentUser.id; });
-            if (userIndex !== -1) {
-                allUsers[userIndex].profilePic = profilePic;
-                localStorage.setItem('yugen_users', JSON.stringify(allUsers));
-            }
-            
-            // Save to current user storage
-            localStorage.setItem('yugen_current_user', JSON.stringify(currentUser));
-            
-            // Update display
-            updateProfileDisplay();
-            
-            alert('Profile picture updated! 📸');
-        };
-        reader.readAsDataURL(file);
-    }
-});
-
-document.getElementById('edit-bio-btn').addEventListener('click', function() {
-    var currentBio = currentUser.bio || '';
-    var newBio = prompt('Edit your bio (max 150 characters):', currentBio);
-    
-    if (newBio !== null) {
-        if (newBio.length > 150) {
-            alert('Bio must be 150 characters or less');
-            return;
-        }
-        
-        if (containsHateSpeech(newBio)) {
-            showWarning('Your bio contains inappropriate language. Please choose kinder words.');
-            return;
-        }
-        
-        // Update current user
-        currentUser.bio = newBio.trim();
-        
-        // Update in allUsers array
-        var userIndex = allUsers.findIndex(function(u) { return u.id === currentUser.id; });
-        if (userIndex !== -1) {
-            allUsers[userIndex].bio = newBio.trim();
-            localStorage.setItem('yugen_users', JSON.stringify(allUsers));
-        }
-        
-        // Save to current user storage
-        localStorage.setItem('yugen_current_user', JSON.stringify(currentUser));
-        
-        // Update display
-        updateProfileDisplay();
-    }
-});
-
-function updateProfileDisplay() {
-    // Update profile picture in profile page
-    if (currentUser.profilePic) {
-        document.getElementById('profile-pic').src = currentUser.profilePic;
-        document.getElementById('profile-pic').style.display = 'block';
-        document.getElementById('profile-avatar-text').style.display = 'none';
-    } else {
-        document.getElementById('profile-pic').style.display = 'none';
-        document.getElementById('profile-avatar-text').style.display = 'flex';
-        document.getElementById('profile-avatar-text').textContent = currentUser.name.charAt(0).toUpperCase();
-    }
-    
-    // Update bio
-    if (currentUser.bio && currentUser.bio.trim()) {
-        document.getElementById('profile-bio-display').textContent = currentUser.bio;
-        document.getElementById('profile-bio-display').style.fontStyle = 'normal';
-        document.getElementById('profile-bio-display').style.color = '';
-    } else {
-        document.getElementById('profile-bio-display').textContent = 'Add a bio to express yourself...';
-        document.getElementById('profile-bio-display').style.fontStyle = 'italic';
-    }
-}
-
-// Update showMainApp function to include profile display
-function showMainAppWithProfile() {
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('main-app').style.display = 'block';
-    document.getElementById('profile-name').textContent = currentUser.name;
-    document.getElementById('profile-username').textContent = '@' + currentUser.username;
-    document.getElementById('following-count').textContent = currentUser.following ? currentUser.following.length : 0;
-    
-    updateProfileDisplay();
-    loadPosts();
-    loadFriends();
-}
-
-// Replace the existing showMainApp() calls with showMainAppWithProfile()
-// Update the showMainApp function
-function showMainApp() {
-    showMainAppWithProfile();
-}
 }
