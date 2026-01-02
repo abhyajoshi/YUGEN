@@ -1,4 +1,5 @@
-// YŪGEN - Enhanced Version with Comments, Follow/Unfollow, Dark Mode, Profile Customization, Delete Posts
+
+// YŪGEN - Complete JavaScript with all features
 var currentUser = null;
 var allUsers = JSON.parse(localStorage.getItem('yugen_users')) || [];
 var allPosts = JSON.parse(localStorage.getItem('yugen_posts')) || [];
@@ -284,6 +285,14 @@ function updateProfileDisplay() {
 
 // Theme Toggle
 document.getElementById('theme-toggle').addEventListener('click', toggleDarkMode);
+
+// Click on YŪGEN title to go home
+document.querySelector('header h1').addEventListener('click', function() {
+    document.querySelectorAll('.nav-btn').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelector('.nav-btn[data-view="create"]').classList.add('active');
+    document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
+    document.getElementById('create-view').classList.add('active');
+});
 
 // Navigation
 document.querySelectorAll('.nav-btn').forEach(function(btn) {
