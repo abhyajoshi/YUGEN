@@ -1,4 +1,3 @@
-
 // YŪGEN - Complete JavaScript with all features
 var currentUser = null;
 var allUsers = JSON.parse(localStorage.getItem('yugen_users')) || [];
